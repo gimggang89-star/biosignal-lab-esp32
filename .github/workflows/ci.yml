@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    name: ESP32 sketches compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32 core 2.0.17
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+      - name: Compile every sketch (except *_blank fill-in versions)
+        run: |
+          fail=0
+          while IFS= read -r ino; do
+            dir=$(dirname "$ino")
+            case "$dir" in *_blank) echo "skip $dir (빈칸 실습본)"; continue;; esac
+            if ! grep -q "void setup" "$ino"; then echo "skip $dir (setup 없는 조각)"; continue; fi
+            echo "::group::$dir"
+            arduino-cli compile --fqbn esp32:esp32:esp32 --warnings default "$dir" || fail=1
+            echo "::endgroup::"
+          done < <(find . -name '*.ino' -not -path './.git/*' | sort)
+          exit $fail
+
+  python:
+    name: Python tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy scipy matplotlib pyserial
+      - name: Syntax check
+        run: python -m compileall -q record labs
+      - name: Filter coefficient generator
+        run: |
+          python labs/week06_frequency_domain_filters/python/gen_coef.py hpf 0.5
+          python labs/week06_frequency_domain_filters/python/gen_coef.py notch 60 30
+          python labs/week06_frequency_domain_filters/python/gen_coef.py fir 51 40
+      - name: EMG pipeline on the synthetic sample
+        working-directory: labs/week09_emg
+        env:
+          MPLBACKEND: Agg
+        run: |
+          mkdir -p results
+          python -X utf8 python/viz.py record samples/synthetic_3_contractions.bin emg 18 results/ci.csv
+          python -X utf8 python/emg_analyze.py detect results/ci.csv --labels labels/e4_labels.csv
