@@ -1,0 +1,14 @@
+label,start_s,end_s
+rest,0,3
+flex,3,5.5
+rest,5.5,6.5
+ext,6.5,9
+rest,9,10
+flex,10,12.5
+rest,12.5,13.5
+ext,13.5,16
+rest,16,17
+flex,17,19.5
+rest,19.5,20.5
+ext,20.5,23
+rest,23,25

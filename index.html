@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biosignal Lab — ESP32 + BioAmp</title>
+<meta name="description" content="ESP32와 BioAmp EXG Pill로 ECG·EEG·EMG·EOG를 측정하고, 브라우저에서 바로 보고, 디지털 필터를 단계별로 실습하는 오픈 키트">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef3f0; --surface:#ffffff; --surface-2:#f5f9f6; --ink:#16352a; --muted:#5d6b63; --line:#dfe8e3;
+    --accent:#1f8a4c; --accent-2:#156b3a; --accent-soft:#e3f2e9; --warm:#e07b24;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1714; --surface:#16211c; --surface-2:#1b2822; --ink:#e6f0ea; --muted:#9fb3a8; --line:#28382f;
+           --accent:#3fbf74; --accent-2:#6fd69a; --accent-soft:#1c3327; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,sans-serif;line-height:1.6}
+  a{color:var(--accent-2)}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  header{padding:56px 0 28px}
+  .eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:.8rem;font-weight:600;color:var(--accent-2);background:var(--accent-soft);padding:4px 12px;border-radius:999px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(31,138,76,.5);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(31,138,76,.45)}70%{box-shadow:0 0 0 10px rgba(31,138,76,0)}100%{box-shadow:0 0 0 0 rgba(31,138,76,0)}}
+  @media (prefers-reduced-motion: reduce){.dot{animation:none}}
+  h1{font-size:clamp(1.8rem,4vw,2.7rem);line-height:1.2;margin:14px 0 10px;letter-spacing:-.01em}
+  .lead{font-size:1.05rem;color:var(--muted);max-width:720px;margin:0}
+  .cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:12px;font-weight:600;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn:hover{transform:translateY(-1px)}
+  .hero{margin-top:28px;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--surface);box-shadow:0 10px 30px rgba(22,53,42,.08)}
+  .hero img{display:block;width:100%;height:auto}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-size:1.35rem;color:var(--accent-2)}
+  .stat span{font-size:.85rem;color:var(--muted)}
+  section{padding:38px 0 8px}
+  h2{font-size:1.35rem;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+  .card img{width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top;border-bottom:1px solid var(--line);background:var(--surface-2)}
+  .card .body{padding:14px 16px 16px}
+  .card h3{margin:0 0 4px;font-size:1.02rem}
+  .card p{margin:0;color:var(--muted);font-size:.9rem}
+  .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--accent-2);background:var(--accent-soft);border-radius:6px;padding:1px 7px;margin-bottom:8px}
+  .card:hover{border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:.93rem}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--surface-2);font-weight:600}
+  tr:last-child td{border-bottom:0}
+  .fig{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;margin:0 0 14px}
+  .fig img{width:100%;height:auto;display:block}
+  .fig figcaption{font-size:.85rem;color:#5d6b63;padding:6px 4px 2px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
+  code{font-family:"IBM Plex Mono",monospace;font-size:.85em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+  @media (max-width:860px){ .grid{grid-template-columns:1fr 1fr} .stats{grid-template-columns:1fr 1fr} .two{grid-template-columns:1fr} }
+  @media (max-width:560px){ .grid{grid-template-columns:1fr} header{padding-top:36px} table{font-size:.85rem} th,td{padding:9px 10px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow"><span class="dot"></span>ESP32 + BioAmp EXG Pill</span>
+    <h1>Biosignal Lab</h1>
+    <p class="lead">심전도·뇌파·근전도·안전도를 직접 측정하고, 브라우저에서 바로 보고, 디지털 필터를 한 단계씩 만들어 보는 실습 키트입니다. 보드가 없어도 아래 뷰어는 합성 신호로 바로 동작합니다.</p>
+    <div class="cta">
+      <a class="btn primary" href="viewer/bioamp_live_viewer.html?demo">실시간 데모 열기 →</a>
+      <a class="btn" href="viewer/ecg_viewer.html">ECG 뷰어</a>
+      <a class="btn" href="https://github.com/gimggang89-star/biosignal-lab-esp32">GitHub 코드</a>
+    </div>
+    <div class="hero"><img src="docs/img/hero.gif" alt="실시간 뷰어가 합성 ECG를 그리는 화면" width="760" height="417"></div>
+    <div class="stats">
+      <div class="stat"><b>4종</b><span>ECG · EEG · EMG · EOG</span></div>
+      <div class="stat"><b>6개</b><span>설치 없는 웹 뷰어</span></div>
+      <div class="stat"><b>3</b><span>주차 실습 (5 · 6 · 9주차)</span></div>
+      <div class="stat"><b>−58 dB</b><span>60 Hz 전원 잡음 (Notch)</span></div>
+    </div>
+  </header>
+
+  <section id="viewers">
+    <h2>웹 뷰어</h2>
+    <p class="sub">파일을 더블클릭하거나 이 페이지에서 바로 엽니다. 측정한 JSON을 끌어놓으면 그 데이터로 바뀝니다.</p>
+    <div class="grid">
+      <a class="card" href="viewer/bioamp_live_viewer.html?demo"><img src="docs/img/thumb_live.png" alt="실시간 뷰어" loading="lazy"><div class="body"><span class="tag">Web Serial</span><h3>실시간 뷰어</h3><p>보드에서 들어오는 신호를 흐르는 그래프로. 실시간 BPM.</p></div></a>
+      <a class="card" href="viewer/ecg_viewer.html"><img src="docs/img/thumb_ecg_viewer.png" alt="ECG 뷰어" loading="lazy"><div class="body"><span class="tag">ECG · 250 Hz</span><h3>심전도 뷰어</h3><p>원본 → Median → HPF → Notch → FIR을 버튼으로 비교, R파 검출.</p></div></a>
+      <a class="card" href="viewer/eeg_viewer.html"><img src="docs/img/thumb_eeg_viewer.png" alt="EEG 뷰어" loading="lazy"><div class="body"><span class="tag">EEG · 256 Hz</span><h3>뇌파 뷰어</h3><p>눈 감으면 커지는 알파파(Berger 효과), FFT 대역 파워.</p></div></a>
+      <a class="card" href="viewer/emg_viewer.html"><img src="docs/img/thumb_emg_viewer.png" alt="EMG 뷰어" loading="lazy"><div class="body"><span class="tag">EMG · 500 Hz</span><h3>근전도 뷰어</h3><p>밴드패스 → 정류 → 활성도(envelope), 수축 횟수 세기.</p></div></a>
+      <a class="card" href="viewer/eog_viewer.html"><img src="docs/img/thumb_eog_viewer.png" alt="EOG 뷰어" loading="lazy"><div class="body"><span class="tag">EOG · 75 Hz</span><h3>안전도 뷰어</h3><p>좌우 안구 이동을 펄스로 검출해 횟수 세기.</p></div></a>
+      <a class="card" href="viewer/bioamp_booth.html?demo"><img src="docs/img/thumb_booth.png" alt="체험 부스 화면" loading="lazy"><div class="body"><span class="tag">Booth</span><h3>체험 부스 화면</h3><p>방문자별로 30초 측정·저장. 개인정보는 파일명에만, 서버 전송 없음.</p></div></a>
+    </div>
+  </section>
+
+  <section id="labs">
+    <h2>실습</h2>
+    <p class="sub">디지털헬스케어시스템 수업 TA로 만든 코드입니다. 빈칸 스케치를 채우고, 파이썬으로 결과를 확인합니다.</p>
+    <table>
+      <tr><th style="width:22%">주차</th><th>배우는 것</th><th style="width:30%">결과로 확인하는 것</th></tr>
+      <tr><td><b>5주차</b><br>시간 영역 필터</td><td>극성 확인 → 이동평균 → Median → Simple IIR → Median→IIR → 4단 종합</td><td>잡음은 줄이면서 R파를 얼마나 남기는지 (Median 78% · IIR 65% · 이동평균 51%)</td></tr>
+      <tr><td><b>6주차</b><br>주파수 영역 필터</td><td>HPF 0.5 Hz · Notch 60 Hz · FIR 51탭 계수를 <code>gen_coef.py</code>로 만들어 스케치에 붙여넣기</td><td>사인파를 일부러 섞어 넣고(<code>INJECT_HZ</code>) 실제 감쇠를 측정</td></tr>
+      <tr><td><b>9주차</b><br>근전도(EMG)</td><td>1 kHz 체인: HPF 20 Hz → Notch → 정류 → MAV·RMS → 기저선 학습 → 히스테리시스 수축 검출, 2채널</td><td>수축 시작·놓침·오검출·지연, 노력 단계별 RMS 직선성, 근피로 중앙주파수(MDF) 감소</td></tr>
+    </table>
+  </section>
+
+  <section id="results">
+    <h2>결과</h2>
+    <p class="sub">모두 합성 신호로 만든 그림입니다. 필터 계수는 스케치에 들어간 값을 그대로 읽어 계산했습니다.</p>
+    <figure class="fig"><img src="docs/img/filter_chain.png" alt="ECG 필터 체인 단계별 파형" loading="lazy"><figcaption>입력 → HPF → Notch → FIR. 호흡 흔들림과 60 Hz 잡음이 단계별로 사라집니다.</figcaption></figure>
+    <figure class="fig"><img src="docs/img/filter_response.png" alt="필터 주파수 응답" loading="lazy"><figcaption>HPF −3 dB 0.50 Hz · Notch −3 dB 폭 1.0 Hz · FIR −3 dB 38 Hz, 60 Hz에서 −59 dB.</figcaption></figure>
+    <figure class="fig"><img src="docs/img/time_domain_filters.png" alt="시간 영역 필터 비교" loading="lazy"><figcaption>5주차: 같은 입력에서 R파 높이 유지율 비교.</figcaption></figure>
+      <figure class="fig" style="max-width:820px"><img src="docs/img/emg_detect.png" alt="EMG 수축 검출" loading="lazy"><figcaption>9주차: 수축 3번 → 전환 6 · 놓침 0 · 오검출 0, 시작 지연 약 37 ms.</figcaption></figure>
+  </section>
+
+  <section id="wiring">
+    <h2>배선</h2>
+    <figure class="fig"><img src="docs/img/wiring.svg" alt="ESP32와 BioAmp 배선, 신호별 전극 위치" loading="lazy"></figure>
+  </section>
+
+  <footer>
+    만든 사람: 김은성 · 건양대학교 의료IT공학과 (디지털헬스케어시스템 TA)<br>
+    BioAmp EXG Pill — Upside Down Labs (MIT). 이 레포의 코드는 MIT 라이선스입니다. 측정 데이터는 개인정보라 포함하지 않습니다.
+  </footer>
+</div>
+</body>
+</html>

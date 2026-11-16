@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BioAmp EEG 뷰어</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#eef3f0; --surface:#ffffff; --surface-2:#f4f8f5;
+    --ink:#0f1a15; --ink-2:#3f5249; --muted:#6b7f75;
+    --line:#d8e3dd; --accent:#12833b; --accent-2:#0e6b31; --accent-soft:#dbf1e3;
+    --trace:#12833b; --raw:#8aa79a; --peak:#c77d15;
+    --grid-major:rgba(18,131,59,0.16); --grid-minor:rgba(18,131,59,0.06);
+    --b-delta:#5b8aa6; --b-theta:#2f9e8f; --b-alpha:#12833b; --b-beta:#c77d15;
+    --danger:#c0392b; --shadow:0 1px 3px rgba(16,40,28,.08),0 8px 24px rgba(16,40,28,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b120e; --surface:#111a15; --surface-2:#0e1611; --ink:#e7f0eb; --ink-2:#aac0b6; --muted:#7c938a;
+      --line:#22302a; --accent:#34d399; --accent-2:#4ade80; --accent-soft:#123626;
+      --trace:#34d399; --raw:#5f7a6e; --peak:#f59e0b;
+      --grid-major:rgba(52,211,153,0.18); --grid-minor:rgba(52,211,153,0.06);
+      --b-delta:#7fb0cc; --b-theta:#3fd6c0; --b-alpha:#34d399; --b-beta:#f59e0b;
+      --danger:#ef6b5c; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b120e; --surface:#111a15; --surface-2:#0e1611; --ink:#e7f0eb; --ink-2:#aac0b6; --muted:#7c938a;
+    --line:#22302a; --accent:#34d399; --accent-2:#4ade80; --accent-soft:#123626;
+    --trace:#34d399; --raw:#5f7a6e; --peak:#f59e0b;
+    --grid-major:rgba(52,211,153,0.18); --grid-minor:rgba(52,211,153,0.06);
+    --b-delta:#7fb0cc; --b-theta:#3fd6c0; --b-alpha:#34d399; --b-beta:#f59e0b;
+    --danger:#ef6b5c; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{ background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans KR",system-ui,-apple-system,sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; padding:24px 20px 40px; }
+  .wrap{max-width:1120px;margin:0 auto}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .title h1{font-size:1.5rem;font-weight:700;margin:0;letter-spacing:-.01em}
+  .title p{margin:2px 0 0;color:var(--muted);font-size:.86rem}
+  .title .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:middle;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @media (prefers-reduced-motion: reduce){.title .dot{animation:none}}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button,.filelabel{font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:9px;transition:border-color .15s,background .15s,transform .05s}
+  button:hover,.filelabel:hover{border-color:var(--accent);color:var(--accent-2)}
+  button:active,.filelabel:active{transform:translateY(1px)}
+  button:focus-visible,.filelabel:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .iconbtn{padding:8px 11px}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+  .vitals{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:stretch;margin-bottom:14px}
+  @media (max-width:640px){.vitals{grid-template-columns:1fr}}
+  .bpmcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 22px 14px 24px;display:flex;flex-direction:column;justify-content:center;gap:2px;box-shadow:var(--shadow);min-width:210px;position:relative;overflow:hidden}
+  .bpmcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .bpmrow{display:flex;align-items:baseline;gap:8px}
+  .bpmcard .val{font-size:3rem;font-weight:600;line-height:1;color:var(--accent);letter-spacing:-.02em}
+  .bpmcard .unit{font-size:.82rem;color:var(--muted);font-weight:600;letter-spacing:.04em}
+  .bpmcard .flex-ico{position:absolute;right:16px;top:14px;color:var(--accent);opacity:.9}
+  .bpmcard .sub{font-size:.74rem;color:var(--muted);margin-top:5px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;align-content:center}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 14px;min-width:88px;box-shadow:var(--shadow)}
+  .chip .k{font-size:.68rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .chip .v{font-size:1.02rem;font-weight:600;margin-top:1px}
+  .plotcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px;position:relative}
+  .plotcard.drag{border-color:var(--accent);border-style:dashed}
+  #plot{display:block;width:100%;height:330px;border-radius:9px;touch-action:none}
+  .droghint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--surface) 82%,transparent);border-radius:14px;font-weight:600;color:var(--accent-2);pointer-events:none;font-size:1.05rem}
+  .plotcard.drag .droghint{display:flex}
+  .demoflag{position:absolute;top:16px;left:16px;background:var(--accent-soft);color:var(--accent-2);font-size:.7rem;font-weight:600;padding:4px 10px;border-radius:20px}
+  .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface);flex-wrap:wrap}
+  .seg button{border:0;border-radius:0;padding:7px 12px;background:transparent;font-weight:500;color:var(--ink-2)}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+  .seg .cap{padding:7px 8px 7px 12px;font-size:.72rem;color:var(--muted);align-self:center;pointer-events:none}
+  #filterseg.dim{opacity:.4;pointer-events:none}
+  #cascadeBtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .rangelbl{margin-left:auto;font-size:.86rem;color:var(--ink-2);font-weight:500}
+  .rangelbl .dur{color:var(--muted);font-weight:400}
+  .overview{margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 6px 4px;box-shadow:var(--shadow)}
+  #ov{display:block;width:100%;height:66px;border-radius:6px;touch-action:none;cursor:pointer}
+  #ov:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .specgrid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-top:14px}
+  @media (max-width:760px){.specgrid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+  .cardhd{font-size:.9rem;font-weight:700;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+  .cardhd .sub{font-size:.72rem;font-weight:500;color:var(--muted)}
+  #spec{display:block;width:100%;height:240px;border-radius:8px;touch-action:none}
+  .bandrow{display:grid;grid-template-columns:96px 1fr 44px;align-items:center;gap:10px;margin:12px 0}
+  .bandrow .bl{display:flex;flex-direction:column;line-height:1.2}
+  .bandrow .bn{font-weight:600;font-size:.9rem}
+  .bandrow .br{font-size:.68rem;color:var(--muted)}
+  .btrack{height:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .bfill{height:100%;border-radius:8px 0 0 8px;transition:width .25s ease}
+  .bandrow .bv{text-align:right;font-weight:600;font-size:.92rem}
+  .bandnote{font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.5}
+  .hint{margin-top:12px;font-size:.77rem;color:var(--muted);line-height:1.55}
+  .hint b{color:var(--ink-2);font-weight:600}
+  .status{margin-top:10px;font-size:.8rem;color:var(--muted);min-height:1.1em}
+  .status.err{color:var(--danger)}
+  footer{margin-top:18px;font-size:.74rem;color:var(--muted);line-height:1.6}
+  footer code{font-family:"IBM Plex Mono",monospace;background:var(--surface-2);padding:1px 6px;border-radius:5px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <h1><span class="dot"></span>뇌파(EEG) 파형 · 스펙트럼 뷰어</h1>
+      <p>ESP32 + BioAmp EXG Pill · 눈을 감으면 8–13Hz 알파파가 커지는지 확인 (Berger 효과)</p>
+    </div>
+    <div class="actions">
+      <label class="filelabel" tabindex="0" role="button">JSON 불러오기<input type="file" id="file" accept=".json,application/json"></label>
+      <button id="sampleBtn">샘플 데이터</button>
+      <button id="themeBtn" class="iconbtn" title="라이트/다크 전환" aria-label="테마 전환">◐</button>
+    </div>
+  </header>
+
+  <section class="vitals">
+    <div class="bpmcard">
+      <svg class="flex-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 3.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.6V14a3 3 0 0 0 4.5 2.6"/><path d="M9.5 3.5A2.5 2.5 0 0 1 12 6v12a2.5 2.5 0 0 1-4.2 1.8"/><path d="M14.5 3.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.6V14a3 3 0 0 1-4.5 2.6"/><path d="M14.5 3.5A2.5 2.5 0 0 0 12 6"/></svg>
+      <div class="bpmrow"><span class="val mono" id="apct">—</span><span class="unit">% 알파</span></div>
+      <div class="sub" id="asub">8–13Hz 상대 파워 · 선택 구간</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><div class="k">알파 피크</div><div class="v mono" id="c_apk">—</div></div>
+      <div class="chip"><div class="k">샘플레이트</div><div class="v mono" id="c_fs">—</div></div>
+      <div class="chip"><div class="k">길이</div><div class="v mono" id="c_dur">—</div></div>
+      <div class="chip"><div class="k">샘플 수</div><div class="v mono" id="c_n">—</div></div>
+      <div class="chip"><div class="k">측정 시각</div><div class="v mono" id="c_at" style="font-size:.82rem">—</div></div>
+    </div>
+  </section>
+
+  <div class="plotcard" id="plotcard">
+    <span class="demoflag" id="demoflag">샘플 데모 데이터</span>
+    <canvas id="plot"></canvas>
+    <div class="droghint">여기에 JSON 파일을 놓으세요</div>
+  </div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="필터" id="filterseg">
+      <span class="cap">필터</span>
+      <button data-f="raw" aria-pressed="false">원본</button>
+      <button data-f="bp" aria-pressed="true">밴드패스</button>
+      <button data-f="theta" aria-pressed="false">세타 θ</button>
+      <button data-f="alpha" aria-pressed="false">알파 α</button>
+      <button data-f="beta" aria-pressed="false">베타 β</button>
+    </div>
+    <button id="cascadeBtn" aria-pressed="false" title="원본→밴드패스→알파 단계별로 한눈에">단계별 보기</button>
+  </div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="확대 / 구간" id="zoomseg">
+      <span class="cap">확대</span>
+      <button id="zout" title="축소" aria-label="축소">－</button>
+      <button id="zin" title="확대" aria-label="확대">＋</button>
+      <button class="pw" data-w="5" aria-pressed="false">5초</button>
+      <button class="pw" data-w="10" aria-pressed="false">10초</button>
+      <button class="pw" data-w="0" aria-pressed="true">전체</button>
+    </div>
+    <div class="rangelbl mono" id="rangelbl">0.0 – 30.0 s <span class="dur">(30.0s)</span></div>
+  </div>
+
+  <div class="overview"><canvas id="ov" tabindex="0" role="slider" aria-label="볼 구간 이동 (막대를 끌어 이동)"></canvas></div>
+
+  <div class="specgrid">
+    <div class="card">
+      <div class="cardhd">주파수 스펙트럼 (FFT) <span class="sub" id="spec_sub">선택 구간</span></div>
+      <canvas id="spec"></canvas>
+    </div>
+    <div class="card">
+      <div class="cardhd">대역별 파워 <span class="sub">상대 비중</span></div>
+      <div id="bandbars"></div>
+      <div class="bandnote" id="bandnote">저주파(δ)가 큰 건 정상(1/f 특성)이에요. <b>눈을 감은 구간을 선택</b>하면 알파 α가 확 올라갑니다.</div>
+    </div>
+  </div>
+
+  <div class="hint"><b>알파파 실험</b>: 아래 막대로 <b>‘눈 감음’ 구간</b>을 선택하면 스펙트럼에 8–13Hz 봉우리가 솟고 알파 %가 올라가요. <b>필터 버튼</b>으로 원본→밴드패스(0.5–29.5Hz)→세타/알파/베타 대역을, <b>단계별 보기</b>로 원본→밴드패스→알파를 한 화면에서. 확대는 ＋／－·마우스 휠.</div>
+  <div class="status" id="status"></div>
+  <footer>
+    <div>필터는 <b>원본(raw)</b>에서 브라우저가 직접 계산합니다 — 밴드패스는 아두이노와 동일(0.5~29.5Hz, 4차 Butterworth, 256Hz 기준). θ(4–8)·α(8–13)·β(13–30)는 대역별 밴드패스, 스펙트럼은 선택 구간의 FFT(Hann 창)입니다. 60Hz 전원잡음은 밴드패스 대역 밖이라 제거됩니다.</div>
+    <div style="margin-top:4px">JSON 형식: <code>{ "sample_rate_hz":256, "data":{ "t_ms":[…], "raw":[…] } }</code> — <code>eeg_record.py</code> 파일을 그대로 불러오면 됩니다(눈 뜸/감음 구간도 함께 표시).</div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const canvas=$("plot"), ctx=canvas.getContext("2d");
+  const ov=$("ov"), octx=ov.getContext("2d");
+  const spec=$("spec"), sctx=spec.getContext("2d");
+  const MINW=0.5, FMAX=40;
+  const FLABEL={ raw:"원본 (Raw)", bp:"밴드패스 0.5–29.5Hz", theta:"세타 θ (4–8Hz)", alpha:"알파 α (8–13Hz)", beta:"베타 β (13–30Hz)" };
+  const BANDS=[["delta","델타 δ","0.5–4 Hz",0.5,4],["theta","세타 θ","4–8 Hz",4,8],["alpha","알파 α","8–13 Hz",8,13],["beta","베타 β","13–30 Hz",13,30]];
+
+  const state={ ds:null, sig:null, cascade:null, rng:null, spec:null, events:[],
+    filter:"bp", cascadeOn:false, selStart:0, selEnd:30, hoverX:null, specHover:null, isDemo:false };
+  const drag={mode:null, offset:0};
+
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function percentile(s,p){ if(!s.length)return 0; const idx=clamp(p/100*(s.length-1),0,s.length-1),lo=Math.floor(idx),hi=Math.ceil(idx); return s[lo]+(s[hi]-s[lo])*(idx-lo); }
+  function rangeOf(arr){ const s=[...arr].sort((a,b)=>a-b); let lo=percentile(s,1),hi=percentile(s,99); if(hi-lo<1){lo=s[0];hi=s[s.length-1]||lo+1;} const pad=(hi-lo)*0.12||1; return {lo:lo-pad,hi:hi+pad}; }
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function niceStep(x){ const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p; return (f<1.5?1:f<3?2:f<7?5:10)*p; }
+  function bandColor(f){ return {raw:css("--trace"),bp:css("--trace"),theta:css("--b-theta"),alpha:css("--b-alpha"),beta:css("--b-beta")}[f]||css("--trace"); }
+
+  // ===== EEG 밴드패스 (아두이노와 동일, 256Hz 기준 공식 계수, raw에서 계산) =====
+  function eegBandpass(raw){
+    const S=[ {a1:-0.95391350,a2:0.25311356,b0:0.00735282,b1:0.01470564,b2:0.00735282},
+              {a1:-1.20596630,a2:0.60558332,b0:1,b1:2,b2:1},
+              {a1:-1.97690645,a2:0.97706395,b0:1,b1:-2,b2:1},
+              {a1:-1.99071687,a2:0.99086813,b0:1,b1:-2,b2:1} ];
+    const z1=[0,0,0,0],z2=[0,0,0,0];
+    const step=inp=>{ let out=inp; for(let k=0;k<4;k++){ const s=S[k]; const x=out - s.a1*z1[k] - s.a2*z2[k]; out=s.b0*x + s.b1*z1[k] + s.b2*z2[k]; z2[k]=z1[k]; z1[k]=x; } return out; };
+    const warm=raw.length?raw[0]:0; for(let w=0;w<300;w++) step(warm);   // 상태 정착 → startup transient 제거
+    return raw.map(step);
+  }
+  // 대역별 밴드패스(RBJ, 2단 = 4차) — 세타/알파/베타 분리
+  function bandFilter(raw, lo, hi, fs){
+    const fc=Math.sqrt(lo*hi), Q=fc/(hi-lo), w0=2*Math.PI*fc/fs, cw=Math.cos(w0), sw=Math.sin(w0), al=sw/(2*Q), a0=1+al;
+    const c={ b0:al/a0, b1:0, b2:-al/a0, a1:-2*cw/a0, a2:(1-al)/a0 };
+    const N=2, z1=new Float64Array(N), z2=new Float64Array(N);
+    const step=inp=>{ let out=inp; for(let s=0;s<N;s++){ const x=out - c.a1*z1[s] - c.a2*z2[s]; out=c.b0*x + c.b1*z1[s] + c.b2*z2[s]; z2[s]=z1[s]; z1[s]=x; } return out; };
+    const warm=raw.length?raw[0]:0; for(let w=0;w<300;w++) step(warm);
+    return raw.map(step);
+  }
+
+  // ===== FFT (반복형 radix-2) + 스펙트럼/대역파워 =====
+  function fft(re,im){ const n=re.length;
+    for(let i=1,j=0;i<n;i++){ let bit=n>>1; for(;j&bit;bit>>=1)j^=bit; j^=bit; if(i<j){ const tr=re[i];re[i]=re[j];re[j]=tr; const ti=im[i];im[i]=im[j];im[j]=ti; } }
+    for(let len=2;len<=n;len<<=1){ const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);
+      for(let i=0;i<n;i+=len){ let cr=1,ci=0; for(let k=0;k<len/2;k++){ const ur=re[i+k],ui=im[i+k], pr=re[i+k+len/2],pi=im[i+k+len/2]; const vr=pr*cr-pi*ci, vi=pr*ci+pi*cr; re[i+k]=ur+vr;im[i+k]=ui+vi; re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi; const nr=cr*wr-ci*wi,ni=cr*wi+ci*wr; cr=nr;ci=ni; } } }
+  }
+  function computeSpectrum(sig,i0,i1,fs){
+    let m=i1-i0+1; if(m<16) return null;
+    let N=1; while(N<m)N<<=1; if(N>8192)N=8192; const L=Math.min(m,N);
+    const re=new Float64Array(N), im=new Float64Array(N);
+    let mean=0; for(let k=0;k<L;k++) mean+=sig[i0+k]; mean/=L;
+    for(let k=0;k<L;k++){ const w=0.5-0.5*Math.cos(2*Math.PI*k/(L-1)); re[k]=(sig[i0+k]-mean)*w; }
+    fft(re,im); const half=N/2; const mags=new Float64Array(half), freqs=new Float64Array(half);
+    for(let k=0;k<half;k++){ freqs[k]=k*fs/N; mags[k]=Math.hypot(re[k],im[k]); }
+    const bp={}; let tot=0;
+    for(const [key,,,lo,hi] of BANDS){ let s=0; for(let k=0;k<half;k++) if(freqs[k]>=lo&&freqs[k]<hi) s+=mags[k]*mags[k]; bp[key]=s; tot+=s; }
+    let ap=0,af=10; for(let k=0;k<half;k++) if(freqs[k]>=8&&freqs[k]<=13&&mags[k]>ap){ ap=mags[k]; af=freqs[k]; }
+    return { freqs, mags, half, N, fs, bandPower:bp, total:tot||1, alphaPct:100*bp.alpha/(tot||1), alphaPeak:af };
+  }
+
+  function loadDataset(ds, isDemo=false){
+    const d=ds.data||ds; let raw=d.raw, t=d.t_ms;
+    if(!Array.isArray(raw)||!raw.length){ setStatus("JSON에서 data.raw 배열을 찾지 못했습니다.",true); return; }
+    const n=raw.length;
+    const fs=ds.sample_rate_hz||ds.effective_rate_hz||(ds.duration_s?Math.round(n/ds.duration_s):256);
+    if(!t||t.length!==n) t=Array.from({length:n},(_,i)=>i/fs*1000);
+    const duration=ds.duration_s||+(n/fs).toFixed(1);
+    state.ds={ raw,t,fs,n,duration_s:duration, recorded_at:ds.recorded_at||null };
+    state.events=Array.isArray(ds.events)?ds.events.slice().sort((a,b)=>a.t_s-b.t_s):[];
+    const bp=eegBandpass(raw), theta=bandFilter(raw,4,8,fs), alpha=bandFilter(raw,8,13,fs), beta=bandFilter(raw,13,30,fs);
+    state.sig={ raw, bp, theta, alpha, beta };
+    state.cascade=[ {data:raw,label:"원본 (Raw)"},{data:bp,label:"① 밴드패스"},{data:alpha,label:"② 알파 α (8–13Hz)"} ];
+    state.rng=new Map(); [raw,bp,theta,alpha,beta].forEach(a=>state.rng.set(a,rangeOf(a)));
+    state.isDemo=isDemo; state.selStart=0; state.selEnd=duration; setPreset(0);
+    updateSpectrum(); updateChips(); updateRangeLabel(); resizeAll();
+    setStatus(isDemo?"샘플 데모 데이터입니다. 상단에서 본인의 EEG JSON을 불러오세요.":`불러오기 완료 · ${n.toLocaleString()} 샘플`);
+    $("demoflag").style.display=isDemo?"":"none";
+  }
+  function selIdx(){ const d=state.ds,fs=d.fs; return [clamp(Math.round(state.selStart*fs),0,d.n-2), clamp(Math.round(state.selEnd*fs),1,d.n-1)]; }
+  function updateSpectrum(){ if(!state.ds)return; const [i0,i1]=selIdx(); state.spec=computeSpectrum(state.sig.bp,i0,i1,state.ds.fs); updateMetric(); updateBandUI(); drawSpectrum(); }
+  function updateMetric(){ const S=state.spec; if(!S){ $("apct").textContent="—"; return; } $("apct").textContent=Math.round(S.alphaPct); $("asub").textContent=`8–13Hz 상대 파워 · 선택 ${state.selStart.toFixed(0)}–${state.selEnd.toFixed(0)}s`; $("c_apk").textContent=S.alphaPeak.toFixed(1)+" Hz"; }
+  function updateChips(){ const d=state.ds; $("c_fs").textContent=d.fs+" Hz"; $("c_dur").textContent=d.duration_s+" s"; $("c_n").textContent=d.n.toLocaleString(); $("c_at").textContent=d.recorded_at?String(d.recorded_at).replace("T"," "):"—"; }
+  function updateBandUI(){ const S=state.spec, host=$("bandbars"); if(!S){host.innerHTML="";return;} host.innerHTML="";
+    for(const [key,name,rng] of BANDS){ const pct=100*S.bandPower[key]/S.total;
+      const row=document.createElement("div"); row.className="bandrow";
+      row.innerHTML=`<div class="bl"><span class="bn">${name}</span><span class="br">${rng}</span></div>`+
+        `<div class="btrack"><div class="bfill" style="width:${clamp(pct,0,100).toFixed(1)}%;background:var(--b-${key})"></div></div>`+
+        `<div class="bv mono">${pct.toFixed(0)}%</div>`;
+      host.appendChild(row); }
+  }
+  function updateRangeLabel(){ $("rangelbl").innerHTML=`${state.selStart.toFixed(1)} – ${state.selEnd.toFixed(1)} s <span class="dur">(${(state.selEnd-state.selStart).toFixed(1)}s)</span>`; }
+  function setPreset(w){ document.querySelectorAll("#zoomseg .pw").forEach(b=>b.setAttribute("aria-pressed",(+b.dataset.w===w)?"true":"false")); }
+  function clearPreset(){ document.querySelectorAll("#zoomseg .pw").forEach(b=>b.setAttribute("aria-pressed","false")); }
+  function applyWidth(w){ const total=state.ds.duration_s; if(w===0){state.selStart=0;state.selEnd=total;setPreset(0);} else{ const c=(state.selStart+state.selEnd)/2; let s=clamp(c-w/2,0,Math.max(0,total-w)); state.selStart=s; state.selEnd=Math.min(total,s+w); setPreset(w);} afterSel(); }
+  function afterSel(){ updateRangeLabel(); render(); drawOverview(); updateSpectrum(); }
+
+  let W=0,H=0,DPR=1;
+  function drawEvents(x0,x1,y0,y1,mapX,i0,i1){
+    if(!state.events.length) return; const total=state.ds.duration_s, fs=state.ds.fs;
+    for(let e=0;e<state.events.length;e++){ const ts=state.events[e].t_s, tn=(e+1<state.events.length)?state.events[e+1].t_s:total;
+      const xa=clamp(mapX(ts*fs),x0,x1), xb=clamp(mapX(tn*fs),x0,x1); if(xb-xa<0.5)continue;
+      const closed=/감/.test(state.events[e].label||"");
+      ctx.fillStyle=closed?css("--accent-soft"):css("--surface-2"); ctx.globalAlpha=closed?.55:.4; ctx.fillRect(xa,y0,xb-xa,y1-y0); ctx.globalAlpha=1;
+      ctx.strokeStyle=css("--line"); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(xa+.5,y0); ctx.lineTo(xa+.5,y1); ctx.stroke();
+      if(xb-xa>44){ ctx.fillStyle=closed?css("--accent-2"):css("--muted"); ctx.font='600 10px "IBM Plex Sans KR",sans-serif'; ctx.textAlign="left"; ctx.textBaseline="top"; ctx.fillText(state.events[e].label,xa+5,y0+4); }
+    }
+  }
+  function render(){
+    if(!state.ds){ ctx.clearRect(0,0,W,H); return; }
+    const d=state.ds; ctx.clearRect(0,0,W,H);
+    const padL=14,padR=12,padT=12,padB=24, x0=padL,x1=W-padR,plotW=x1-x0,y0=padT,y1=H-padB,plotH=y1-y0;
+    const fs=d.fs, winSec=state.selEnd-state.selStart;
+    const i0=clamp(Math.round(state.selStart*fs),0,d.n-2), i1=clamp(Math.round(state.selEnd*fs),i0+1,d.n-1);
+    const mapX=i=>x0+(i-i0)/(i1-i0)*plotW;
+
+    drawEvents(x0,x1,y0,y1,mapX,i0,i1);
+
+    let panels;
+    if(state.cascadeOn){ panels=state.cascade.map((s,k)=>({data:s.data,label:s.label,color:k===0?css("--raw"):(k===2?css("--b-alpha"):css("--trace"))})); }
+    else if(state.filter==="raw"){ panels=[{data:state.sig.raw,label:"원본 (Raw)",color:css("--trace")}]; }
+    else { panels=[{data:state.sig.raw,label:"원본 (Raw)",color:css("--raw")},{data:state.sig[state.filter],label:FLABEL[state.filter],color:bandColor(state.filter)}]; }
+    const gap=panels.length>=3?12:14, ph=(plotH-gap*(panels.length-1))/panels.length;
+
+    const startS=state.selStart,endS=state.selEnd, major=niceStep(winSec/8), minor=winSec<=6?major/5:0;
+    ctx.lineWidth=1;
+    if(minor){ ctx.strokeStyle=css("--grid-minor"); ctx.beginPath(); for(let ts=Math.ceil(startS/minor)*minor;ts<=endS+1e-6;ts+=minor){const xx=mapX(ts*fs);ctx.moveTo(xx,y0);ctx.lineTo(xx,y1);} ctx.stroke(); }
+    ctx.strokeStyle=css("--grid-major"); ctx.beginPath(); const ticks=[];
+    for(let ts=Math.ceil(startS/major)*major;ts<=endS+1e-6;ts+=major){const xx=mapX(ts*fs);ctx.moveTo(xx,y0);ctx.lineTo(xx,y1);ticks.push([xx,ts]);} ctx.stroke();
+    ctx.fillStyle=css("--muted"); ctx.font='11px "IBM Plex Mono",monospace'; ctx.textAlign="center"; ctx.textBaseline="top";
+    ticks.forEach(([xx,ts])=>ctx.fillText(ts.toFixed(winSec<=6?1:0)+"s",xx,y1+6));
+
+    panels.forEach((pnl,pi)=>{
+      const py0=y0+pi*(ph+gap), py1=py0+ph, rng=state.rng.get(pnl.data)||rangeOf(pnl.data);
+      const mapY=v=>py1-(v-rng.lo)/(rng.hi-rng.lo)*(py1-py0);
+      ctx.strokeStyle=css("--grid-minor"); ctx.lineWidth=1; ctx.beginPath(); for(let g=0;g<=2;g++){const yy=py0+g/2*(py1-py0);ctx.moveTo(x0,yy);ctx.lineTo(x1,yy);} ctx.stroke();
+      ctx.strokeStyle=css("--line"); ctx.strokeRect(x0,py0,plotW,py1-py0);
+      const sig=pnl.data;
+      if(pnl.color!==css("--raw") && rng.lo<0 && rng.hi>0){ const yz=mapY(0); ctx.strokeStyle=css("--grid-major"); ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x0,yz); ctx.lineTo(x1,yz); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.strokeStyle=pnl.color; ctx.lineWidth=(pnl.color===css("--raw"))?1.0:1.5; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+      const span=i1-i0;
+      if(span<=plotW){ let first=true; for(let i=i0;i<=i1;i++){const xx=mapX(i),yy=mapY(sig[i]); if(first){ctx.moveTo(xx,yy);first=false;}else ctx.lineTo(xx,yy);} }
+      else { for(let px=0;px<=plotW;px++){ const a=i0+Math.floor(px/plotW*span),b=i0+Math.floor((px+1)/plotW*span); let mn=Infinity,mx=-Infinity; for(let i=a;i<b&&i<=i1;i++){const v=sig[i];if(v<mn)mn=v;if(v>mx)mx=v;} if(mn===Infinity)continue; const xx=x0+px; ctx.lineTo(xx,mapY(mx)); ctx.lineTo(xx,mapY(mn)); } }
+      ctx.stroke();
+      ctx.fillStyle=css("--muted"); ctx.font='600 11px "IBM Plex Sans KR",sans-serif'; ctx.textAlign="right"; ctx.textBaseline="top"; ctx.fillText(pnl.label,x1-8,py0+5);
+    });
+
+    if(state.hoverX!=null && state.hoverX>=x0 && state.hoverX<=x1){
+      const frac=(state.hoverX-x0)/plotW, idx=clamp(Math.round(i0+frac*(i1-i0)),0,d.n-1);
+      ctx.strokeStyle=css("--accent"); ctx.globalAlpha=.5; ctx.lineWidth=1; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(state.hoverX,y0); ctx.lineTo(state.hoverX,y1); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      const label=(idx/fs).toFixed(2)+"s"; ctx.font='11px "IBM Plex Mono",monospace'; const tw=ctx.measureText(label).width; const bx=clamp(state.hoverX+8,x0,x1-tw-12);
+      ctx.fillStyle=css("--ink"); ctx.globalAlpha=.92; ctx.fillRect(bx,y0+4,tw+12,20); ctx.globalAlpha=1; ctx.fillStyle=css("--bg"); ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(label,bx+6,y0+14);
+    }
+  }
+
+  // ===== 스펙트럼 그리기 =====
+  let sW=0,sH=0;
+  function drawSpectrum(){
+    sctx.clearRect(0,0,sW,sH); sctx.fillStyle=css("--surface-2"); sctx.fillRect(0,0,sW,sH);
+    const S=state.spec; const padL=8,padR=10,padT=12,padB=22, x0=padL,x1=sW-padR,plotW=x1-x0,y0=padT,y1=sH-padB,plotH=y1-y0;
+    if(!S){ sctx.fillStyle=css("--muted"); sctx.font='12px "IBM Plex Sans KR",sans-serif'; sctx.textAlign="center"; sctx.textBaseline="middle"; sctx.fillText("구간이 너무 짧아요",sW/2,sH/2); return; }
+    const fx=f=>x0+f/FMAX*plotW;
+    // 대역 음영 + 라벨
+    for(const [key,,,lo,hi] of BANDS){ const xa=fx(lo),xb=fx(Math.min(hi,FMAX)); sctx.fillStyle=css("--b-"+key); sctx.globalAlpha=(key==="alpha")?.16:.08; sctx.fillRect(xa,y0,xb-xa,plotH); sctx.globalAlpha=1;
+      sctx.fillStyle=css("--b-"+key); sctx.globalAlpha=.9; sctx.font='700 10px "IBM Plex Sans KR",sans-serif'; sctx.textAlign="center"; sctx.textBaseline="top"; sctx.fillText(key==="delta"?"δ":key==="theta"?"θ":key==="alpha"?"α":"β",(xa+xb)/2,y0+2); sctx.globalAlpha=1; }
+    // y 스케일: 2Hz 이상 최대(저주파 스파이크가 알파를 가리지 않도록)
+    let yMax=1e-9; for(let k=0;k<S.half;k++){ if(S.freqs[k]>=2&&S.freqs[k]<=FMAX&&S.mags[k]>yMax)yMax=S.mags[k]; } yMax*=1.15;
+    const my=m=>y1-clamp(m/yMax,0,1)*plotH;
+    // 곡선(채움)
+    sctx.beginPath(); sctx.moveTo(fx(0),y1);
+    for(let k=0;k<S.half;k++){ const f=S.freqs[k]; if(f>FMAX)break; sctx.lineTo(fx(f),my(S.mags[k])); }
+    sctx.lineTo(fx(FMAX),y1); sctx.closePath(); sctx.fillStyle=css("--accent"); sctx.globalAlpha=.14; sctx.fill(); sctx.globalAlpha=1;
+    sctx.beginPath(); let first=true; for(let k=0;k<S.half;k++){ const f=S.freqs[k]; if(f>FMAX)break; const xx=fx(f),yy=my(S.mags[k]); if(first){sctx.moveTo(xx,yy);first=false;}else sctx.lineTo(xx,yy); }
+    sctx.strokeStyle=css("--accent"); sctx.lineWidth=1.6; sctx.lineJoin="round"; sctx.stroke();
+    // 알파 피크 표시
+    const pf=S.alphaPeak; if(pf>=8&&pf<=13){ const px=fx(pf); let pm=0; for(let k=0;k<S.half;k++) if(Math.abs(S.freqs[k]-pf)<0.1)pm=Math.max(pm,S.mags[k]); const py=my(pm);
+      sctx.strokeStyle=css("--b-alpha"); sctx.setLineDash([3,3]); sctx.beginPath(); sctx.moveTo(px,y0); sctx.lineTo(px,y1); sctx.stroke(); sctx.setLineDash([]);
+      sctx.fillStyle=css("--b-alpha"); sctx.beginPath(); sctx.arc(px,py,3.5,0,Math.PI*2); sctx.fill();
+      const lab=pf.toFixed(1)+"Hz"; sctx.font='600 10px "IBM Plex Mono",monospace'; const tw=sctx.measureText(lab).width; const bx=clamp(px+6,x0,x1-tw-4); sctx.fillStyle=css("--ink"); sctx.textAlign="left"; sctx.textBaseline="top"; sctx.fillText(lab,bx,y0+1); }
+    // x 눈금
+    sctx.fillStyle=css("--muted"); sctx.font='10px "IBM Plex Mono",monospace'; sctx.textAlign="center"; sctx.textBaseline="top";
+    for(let f=0;f<=FMAX;f+=10){ sctx.fillText(f+"Hz",fx(f),y1+5); sctx.strokeStyle=css("--grid-minor"); sctx.beginPath(); sctx.moveTo(fx(f),y0); sctx.lineTo(fx(f),y1); sctx.stroke(); }
+    // hover
+    if(state.specHover!=null && state.specHover>=x0 && state.specHover<=x1){ const f=(state.specHover-x0)/plotW*FMAX;
+      sctx.strokeStyle=css("--accent"); sctx.globalAlpha=.5; sctx.setLineDash([4,4]); sctx.beginPath(); sctx.moveTo(state.specHover,y0); sctx.lineTo(state.specHover,y1); sctx.stroke(); sctx.setLineDash([]); sctx.globalAlpha=1;
+      const lab=f.toFixed(1)+" Hz"; sctx.font='11px "IBM Plex Mono",monospace'; const tw=sctx.measureText(lab).width; const bx=clamp(state.specHover+8,x0,x1-tw-12); sctx.fillStyle=css("--ink"); sctx.globalAlpha=.92; sctx.fillRect(bx,y0+2,tw+12,19); sctx.globalAlpha=1; sctx.fillStyle=css("--bg"); sctx.textAlign="left"; sctx.textBaseline="middle"; sctx.fillText(lab,bx+6,y0+11); }
+  }
+
+  // ===== overview =====
+  let ovW=0,ovH=0; const ovPad=1;
+  const oT2X=t=>ovPad+t/state.ds.duration_s*(ovW-2*ovPad);
+  const oX2T=px=>clamp((px-ovPad)/(ovW-2*ovPad)*state.ds.duration_s,0,state.ds.duration_s);
+  function drawOverview(){
+    if(!state.ds)return; const d=state.ds;
+    octx.clearRect(0,0,ovW,ovH); octx.fillStyle=css("--surface-2"); octx.fillRect(0,0,ovW,ovH);
+    const w=ovW-2*ovPad,x0=ovPad, fs=d.fs, total=d.duration_s;
+    // 이벤트(눈 뜸/감음) 음영
+    if(state.events.length){ for(let e=0;e<state.events.length;e++){ const ts=state.events[e].t_s, tn=(e+1<state.events.length)?state.events[e+1].t_s:total; const xa=oT2X(ts),xb=oT2X(tn); if(/감/.test(state.events[e].label||"")){ octx.fillStyle=css("--accent-soft"); octx.globalAlpha=.6; octx.fillRect(xa,0,xb-xa,ovH); octx.globalAlpha=1; } } }
+    const sig=state.sig.alpha, n=d.n, rng=state.rng.get(sig);
+    const mapY=v=>ovH-4-(v-rng.lo)/(rng.hi-rng.lo)*(ovH-8);
+    octx.strokeStyle=css("--b-alpha"); octx.globalAlpha=.85; octx.lineWidth=1; octx.beginPath();
+    for(let px=0;px<=w;px++){ const a=Math.floor(px/w*n),b=Math.floor((px+1)/w*n); let mn=Infinity,mx=-Infinity; for(let i=a;i<b&&i<n;i++){ const v=sig[i]; if(v<mn)mn=v; if(v>mx)mx=v; } if(mn===Infinity)continue; const xx=x0+px; octx.lineTo(xx,mapY(mx)); octx.lineTo(xx,mapY(mn)); }
+    octx.stroke(); octx.globalAlpha=1;
+    const sx=oT2X(state.selStart),ex=oT2X(state.selEnd);
+    octx.fillStyle=css("--surface"); octx.globalAlpha=.5; octx.fillRect(0,0,sx,ovH); octx.fillRect(ex,0,ovW-ex,ovH); octx.globalAlpha=1;
+    octx.fillStyle=css("--accent"); octx.globalAlpha=.12; octx.fillRect(sx,0,ex-sx,ovH); octx.globalAlpha=1;
+    octx.strokeStyle=css("--accent"); octx.lineWidth=1.5; octx.strokeRect(sx+0.75,0.75,ex-sx-1.5,ovH-1.5);
+    octx.fillStyle=css("--accent"); [sx,ex].forEach(hx=>octx.fillRect(hx-1.5,0,3,ovH));
+  }
+  function ovHit(px){ const sx=oT2X(state.selStart),ex=oT2X(state.selEnd); if(px>=sx-4&&px<=ex+4)return "M"; return "OUT"; }
+  ov.addEventListener("pointerdown",e=>{ if(!state.ds)return; ov.setPointerCapture(e.pointerId); const px=e.offsetX,hit=ovHit(px),total=state.ds.duration_s; if(hit==="OUT"){const w=state.selEnd-state.selStart,c=oX2T(px);state.selStart=clamp(c-w/2,0,total-w);state.selEnd=state.selStart+w;} drag.mode="M"; drag.offset=oX2T(px)-state.selStart; afterSel(); });
+  ov.addEventListener("pointermove",e=>{ if(!state.ds)return; const px=e.offsetX; if(!drag.mode){ ov.style.cursor=ovHit(px)==="M"?"grab":"pointer"; return; } const total=state.ds.duration_s,t=oX2T(px),w=state.selEnd-state.selStart; state.selStart=clamp(t-drag.offset,0,total-w); state.selEnd=state.selStart+w; ov.style.cursor="grabbing"; updateRangeLabel(); render(); drawOverview(); });
+  const endDrag=e=>{ if(drag.mode){ drag.mode=null; try{ov.releasePointerCapture(e.pointerId);}catch(_){}; updateSpectrum(); } };
+  ov.addEventListener("pointerup",endDrag); ov.addEventListener("pointercancel",endDrag);
+  ov.addEventListener("keydown",e=>{ if(!state.ds)return; const total=state.ds.duration_s,w=state.selEnd-state.selStart,step=Math.max(0.1,w*0.1); if(e.key==="ArrowLeft"){state.selStart=clamp(state.selStart-step,0,total-w);state.selEnd=state.selStart+w;} else if(e.key==="ArrowRight"){state.selStart=clamp(state.selStart+step,0,total-w);state.selEnd=state.selStart+w;} else if(e.key==="Home"){state.selStart=0;state.selEnd=w;} else if(e.key==="End"){state.selEnd=total;state.selStart=total-w;} else return; e.preventDefault(); afterSel(); });
+
+  function resizeAll(){ DPR=window.devicePixelRatio||1;
+    let r=canvas.getBoundingClientRect(); W=r.width;H=r.height; canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
+    let ro=ov.getBoundingClientRect(); ovW=ro.width;ovH=ro.height; ov.width=Math.round(ovW*DPR); ov.height=Math.round(ovH*DPR); octx.setTransform(DPR,0,0,DPR,0,0);
+    let rs=spec.getBoundingClientRect(); sW=rs.width;sH=rs.height; spec.width=Math.round(sW*DPR); spec.height=Math.round(sH*DPR); sctx.setTransform(DPR,0,0,DPR,0,0);
+    render(); drawOverview(); drawSpectrum(); }
+  function setStatus(m,err){ const s=$("status"); s.textContent=m||""; s.classList.toggle("err",!!err); }
+
+  // ===== sample: 눈 뜸/감음 알파파(Berger 효과) =====
+  function makeSample(){
+    const fs=256,dur=30,n=fs*dur; const t=new Array(n),raw=new Array(n);
+    const alphaEnv=x=>Math.max(0,Math.min((x-10)/1.5,(20-x)/1.5,1));   // 10~20초 눈 감음
+    let seed=98765; const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff-0.5; };
+    let pink=0;
+    for(let i=0;i<n;i++){ const x=i/fs;
+      pink=0.97*pink+rnd()*40;                                          // 1/f 저주파 배경(δ/θ)
+      const theta=8*Math.sin(2*Math.PI*6*x+0.5);
+      const beta =6*Math.sin(2*Math.PI*20*x)+5*Math.sin(2*Math.PI*24*x+1);
+      const alpha=alphaEnv(x)*46*Math.sin(2*Math.PI*10.2*x);           // 눈 감으면 커지는 알파
+      const hum  =4*Math.sin(2*Math.PI*60*x);                          // 60Hz 전원잡음
+      raw[i]=Math.round(2048+pink+theta+beta+alpha+hum+rnd()*10);
+      t[i]=+(x*1000).toFixed(1);
+    }
+    return {device:"ESP32 + BioAmp EXG Pill (synthetic demo)",channel:"EEG",sample_rate_hz:fs,duration_s:dur,n_samples:n,recorded_at:"(샘플 데모)",
+      events:[{t_s:0,label:"눈 뜸"},{t_s:10,label:"눈 감음"},{t_s:20,label:"눈 뜸"}], data:{t_ms:t,raw}};
+  }
+
+  // ===== events =====
+  document.querySelectorAll("#filterseg button").forEach(b=>b.addEventListener("click",()=>{
+    state.cascadeOn=false; $("cascadeBtn").setAttribute("aria-pressed","false"); $("filterseg").classList.remove("dim");
+    document.querySelectorAll("#filterseg button").forEach(x=>x.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true"); state.filter=b.dataset.f; render(); drawOverview();
+  }));
+  $("cascadeBtn").addEventListener("click",()=>{ state.cascadeOn=!state.cascadeOn; $("cascadeBtn").setAttribute("aria-pressed",state.cascadeOn?"true":"false"); $("filterseg").classList.toggle("dim",state.cascadeOn); render(); drawOverview(); });
+  document.querySelectorAll("#zoomseg .pw").forEach(b=>b.addEventListener("click",()=>applyWidth(+b.dataset.w)));
+  function zoomBy(f){ if(!state.ds)return; const total=state.ds.duration_s,win=state.selEnd-state.selStart,c=(state.selStart+state.selEnd)/2; const nw=clamp(win*f,MINW,total); let s=clamp(c-nw/2,0,total-nw); state.selStart=s;state.selEnd=s+nw; clearPreset(); afterSel(); }
+  $("zin").addEventListener("click",()=>zoomBy(0.9)); $("zout").addEventListener("click",()=>zoomBy(1/0.9));
+  canvas.addEventListener("wheel",e=>{ if(!state.ds)return; e.preventDefault(); const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left; const x0=14,x1=W-12,plotW=x1-x0,frac=clamp((x-x0)/plotW,0,1); const total=state.ds.duration_s,win=state.selEnd-state.selStart,cur=state.selStart+frac*win; const nw=clamp(win*(e.deltaY<0?0.92:1/0.92),MINW,total); let s=clamp(cur-frac*nw,0,total-nw); state.selStart=s;state.selEnd=s+nw; clearPreset(); afterSel(); },{passive:false});
+  $("sampleBtn").addEventListener("click",()=>loadDataset(makeSample(),true));
+  $("file").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) readFile(f); });
+  $("themeBtn").addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme: dark)").matches; const next=dark?"light":"dark"; document.documentElement.setAttribute("data-theme",next); try{localStorage.setItem("eegtheme",next);}catch(_){} render(); drawOverview(); drawSpectrum(); });
+  const card=$("plotcard");
+  ["dragenter","dragover"].forEach(ev=>card.addEventListener(ev,e=>{e.preventDefault();card.classList.add("drag");}));
+  ["dragleave","drop"].forEach(ev=>card.addEventListener(ev,e=>{e.preventDefault();if(ev!=="dragover")card.classList.remove("drag");}));
+  card.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
+  canvas.addEventListener("mousemove",e=>{ const r=canvas.getBoundingClientRect(); state.hoverX=e.clientX-r.left; render(); });
+  canvas.addEventListener("mouseleave",()=>{ state.hoverX=null; render(); });
+  spec.addEventListener("mousemove",e=>{ const r=spec.getBoundingClientRect(); state.specHover=e.clientX-r.left; drawSpectrum(); });
+  spec.addEventListener("mouseleave",()=>{ state.specHover=null; drawSpectrum(); });
+  function readFile(f){ const fr=new FileReader(); fr.onload=()=>{ try{ loadDataset(JSON.parse(fr.result),false); }catch(err){ setStatus("JSON을 읽을 수 없습니다: "+err.message,true); } }; fr.onerror=()=>setStatus("파일을 읽는 중 오류.",true); fr.readAsText(f); }
+  let rto; window.addEventListener("resize",()=>{clearTimeout(rto);rto=setTimeout(resizeAll,120);});
+
+  try{ const th=localStorage.getItem("eegtheme"); if(th) document.documentElement.setAttribute("data-theme",th);}catch(_){}
+  loadDataset(makeSample(), true);
+})();
+</script>
+</body>
+</html>

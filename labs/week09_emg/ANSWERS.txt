@@ -1,0 +1,19 @@
+﻿빈칸 정답 — arduino\student\emg_chain\emg_core.h 의 TODO 자리
+=====================================================
+① 정류 (float rect = 0.0f; 를 바꾼다)
+    float rect = fabsf(y);
+
+② 제곱 합 갱신 3줄 (TODO 주석 아래에, 이 순서대로: 빼고 → 더하고 → 저장)
+    c->sumsq -= c->sq[c->idx];
+    c->sumsq += y * y;
+    c->sq[c->idx] = y * y;
+   (저장을 먼저 하면 오래된 값이 지워져서 뺄 수 없다)
+
+③ 히스테리시스 비교 (int above = 0; 을 바꾼다)
+    int above = c->on ? (c->rms > c->thr_off) : (c->rms > c->thr_on);
+
+확인 방법
+ - 업로드 후 시리얼 모니터(115200, 줄 바꿈 없음)에 s 를 보낸다
+   #S,... mav=… rms=… thr_on=… state=… 에서 mav 가 0 이 아니면 ①, rms 가 0 이 아니면 ②
+   수축하는 동안 state=2 (보드 LED 켜짐) 이면 ③
+ - 또는 bat 기록 뒤 화면의 "펌웨어 기저선 … MAV 평균" 이 0 이 아니면 ①, "RMS 평균" 이 0 이 아니면 ②

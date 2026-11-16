@@ -1,0 +1,12 @@
+label,start_s,end_s
+rest,0,3
+f10,3,6
+rest,6,8
+f25,8,11
+rest,11,13
+f50,13,16
+rest,16,18
+f75,18,21
+rest,21,23
+f100,23,26
+rest,26,30

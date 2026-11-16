@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BioAmp EMG 뷰어</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#eef3f0; --surface:#ffffff; --surface-2:#f4f8f5;
+    --ink:#0f1a15; --ink-2:#3f5249; --muted:#6b7f75;
+    --line:#d8e3dd; --accent:#12833b; --accent-2:#0e6b31; --accent-soft:#dbf1e3;
+    --trace:#12833b; --raw:#8aa79a; --peak:#d97706;
+    --grid-major:rgba(18,131,59,0.16); --grid-minor:rgba(18,131,59,0.06);
+    --danger:#c0392b; --shadow:0 1px 3px rgba(16,40,28,.08),0 8px 24px rgba(16,40,28,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b120e; --surface:#111a15; --surface-2:#0e1611; --ink:#e7f0eb; --ink-2:#aac0b6; --muted:#7c938a;
+      --line:#22302a; --accent:#34d399; --accent-2:#4ade80; --accent-soft:#123626;
+      --trace:#34d399; --raw:#5f7a6e; --peak:#f59e0b;
+      --grid-major:rgba(52,211,153,0.18); --grid-minor:rgba(52,211,153,0.06);
+      --danger:#ef6b5c; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b120e; --surface:#111a15; --surface-2:#0e1611; --ink:#e7f0eb; --ink-2:#aac0b6; --muted:#7c938a;
+    --line:#22302a; --accent:#34d399; --accent-2:#4ade80; --accent-soft:#123626;
+    --trace:#34d399; --raw:#5f7a6e; --peak:#f59e0b;
+    --grid-major:rgba(52,211,153,0.18); --grid-minor:rgba(52,211,153,0.06);
+    --danger:#ef6b5c; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{ background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans KR",system-ui,-apple-system,sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; padding:24px 20px 40px; }
+  .wrap{max-width:1080px;margin:0 auto}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .title h1{font-size:1.5rem;font-weight:700;margin:0;letter-spacing:-.01em}
+  .title p{margin:2px 0 0;color:var(--muted);font-size:.86rem}
+  .title .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:middle;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  @media (prefers-reduced-motion: reduce){.title .dot{animation:none}}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button,.filelabel{font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:9px;transition:border-color .15s,background .15s,transform .05s}
+  button:hover,.filelabel:hover{border-color:var(--accent);color:var(--accent-2)}
+  button:active,.filelabel:active{transform:translateY(1px)}
+  button:focus-visible,.filelabel:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .iconbtn{padding:8px 11px}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+  .vitals{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:stretch;margin-bottom:14px}
+  @media (max-width:640px){.vitals{grid-template-columns:1fr}}
+  .bpmcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 22px 14px 24px;display:flex;flex-direction:column;justify-content:center;gap:2px;box-shadow:var(--shadow);min-width:200px;position:relative;overflow:hidden}
+  .bpmcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .bpmrow{display:flex;align-items:baseline;gap:8px}
+  .bpmcard .val{font-size:3rem;font-weight:600;line-height:1;color:var(--accent);letter-spacing:-.02em}
+  .bpmcard .unit{font-size:.82rem;color:var(--muted);font-weight:600;letter-spacing:.06em}
+  .bpmcard .flex-ico{position:absolute;right:16px;top:14px;color:var(--accent);opacity:.9;font-size:1.1rem}
+  .bpmcard .sub{font-size:.74rem;color:var(--muted);margin-top:5px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;align-content:center}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 14px;min-width:92px;box-shadow:var(--shadow)}
+  .chip .k{font-size:.68rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .chip .v{font-size:1.02rem;font-weight:600;margin-top:1px}
+  .plotcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px;position:relative}
+  .plotcard.drag{border-color:var(--accent);border-style:dashed}
+  #plot{display:block;width:100%;height:430px;border-radius:9px;touch-action:none}
+  .droghint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:color-mix(in srgb,var(--surface) 82%,transparent);border-radius:14px;font-weight:600;color:var(--accent-2);pointer-events:none;font-size:1.05rem}
+  .plotcard.drag .droghint{display:flex}
+  .demoflag{position:absolute;top:16px;left:16px;background:var(--accent-soft);color:var(--accent-2);font-size:.7rem;font-weight:600;padding:4px 10px;border-radius:20px}
+  .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface);flex-wrap:wrap}
+  .seg button{border:0;border-radius:0;padding:7px 12px;background:transparent;font-weight:500;color:var(--ink-2)}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+  .seg .cap{padding:7px 8px 7px 12px;font-size:.72rem;color:var(--muted);align-self:center;pointer-events:none}
+  #filterseg.dim{opacity:.4;pointer-events:none}
+  #cascadeBtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .rangelbl{margin-left:auto;font-size:.86rem;color:var(--ink-2);font-weight:500}
+  .rangelbl .dur{color:var(--muted);font-weight:400}
+  .overview{margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 6px 4px;box-shadow:var(--shadow)}
+  #ov{display:block;width:100%;height:74px;border-radius:6px;touch-action:none;cursor:pointer}
+  #ov:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .hint{margin-top:9px;font-size:.77rem;color:var(--muted);line-height:1.55}
+  .hint b{color:var(--ink-2);font-weight:600}
+  .status{margin-top:10px;font-size:.8rem;color:var(--muted);min-height:1.1em}
+  .status.err{color:var(--danger)}
+  footer{margin-top:20px;font-size:.74rem;color:var(--muted);line-height:1.6}
+  footer code{font-family:"IBM Plex Mono",monospace;background:var(--surface-2);padding:1px 6px;border-radius:5px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <h1><span class="dot"></span>근전도(EMG) 파형 뷰어</h1>
+      <p>ESP32 + BioAmp EXG Pill · 근육에 힘을 줄 때 신호가 어떻게 변하는지 확인</p>
+    </div>
+    <div class="actions">
+      <label class="filelabel" tabindex="0" role="button">JSON 불러오기<input type="file" id="file" accept=".json,application/json"></label>
+      <button id="sampleBtn">샘플 데이터</button>
+      <button id="themeBtn" class="iconbtn" title="라이트/다크 전환" aria-label="테마 전환">◐</button>
+    </div>
+  </header>
+
+  <section class="vitals">
+    <div class="bpmcard">
+      <svg class="flex-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>
+      <div class="bpmrow"><span class="val mono" id="ccount">—</span><span class="unit">회 수축</span></div>
+      <div class="sub mono" id="csub">—</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><div class="k">평균 활성도</div><div class="v mono" id="c_mean">—</div></div>
+      <div class="chip"><div class="k">샘플레이트</div><div class="v mono" id="c_fs">—</div></div>
+      <div class="chip"><div class="k">길이</div><div class="v mono" id="c_dur">—</div></div>
+      <div class="chip"><div class="k">샘플 수</div><div class="v mono" id="c_n">—</div></div>
+      <div class="chip"><div class="k">측정 시각</div><div class="v mono" id="c_at" style="font-size:.82rem">—</div></div>
+    </div>
+  </section>
+
+  <div class="plotcard" id="plotcard">
+    <span class="demoflag" id="demoflag">샘플 데모 데이터</span>
+    <canvas id="plot"></canvas>
+    <div class="droghint">여기에 JSON 파일을 놓으세요</div>
+  </div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="필터" id="filterseg">
+      <span class="cap">필터</span>
+      <button data-f="raw" aria-pressed="false">원본</button>
+      <button data-f="bp" aria-pressed="false">밴드패스</button>
+      <button data-f="rect" aria-pressed="false">정류</button>
+      <button data-f="env" aria-pressed="true">활성도</button>
+    </div>
+    <button id="cascadeBtn" aria-pressed="false" title="원본→밴드패스→정류→활성도 단계별로 한눈에">단계별 보기</button>
+  </div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="확대 / 구간" id="zoomseg">
+      <span class="cap">확대</span>
+      <button id="zout" title="축소" aria-label="축소">－</button>
+      <button id="zin" title="확대" aria-label="확대">＋</button>
+      <button class="pw" data-w="5" aria-pressed="false">5초</button>
+      <button class="pw" data-w="10" aria-pressed="false">10초</button>
+      <button class="pw" data-w="0" aria-pressed="true">전체</button>
+    </div>
+    <div class="rangelbl mono" id="rangelbl">0.0 – 20.0 s <span class="dur">(20.0s)</span></div>
+  </div>
+
+  <div class="overview"><canvas id="ov" tabindex="0" role="slider" aria-label="볼 구간 이동 (막대를 끌어 이동)"></canvas></div>
+  <div class="hint"><b>활성도</b>는 근육에 힘을 줄 때 올라가는 곡선이에요(주먹 쥐기 등). <b>필터 버튼</b>으로 원본→밴드패스→정류→활성도를, <b>단계별 보기</b>로 그 과정을 한 화면에서 볼 수 있어요. 아래 막대는 <b>끌면 구간 이동</b>, 확대는 ＋／－·마우스 휠.</div>
+  <div class="status" id="status"></div>
+  <footer>
+    <div>필터는 <b>원본(raw)</b>에서 브라우저가 직접 계산합니다 — 아두이노와 동일(밴드패스 74.5~149.5Hz, 정류, 128칸 이동합 엔벨로프 ×2, 500Hz 기준). 60Hz 전원잡음은 밴드패스 대역 밖이라 함께 제거됩니다.</div>
+    <div style="margin-top:4px">JSON 형식: <code>{ "sample_rate_hz":500, "data":{ "t_ms":[…], "raw":[…] } }</code> — <code>emg_record.py</code> 파일을 그대로 불러오면 됩니다.</div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const canvas=$("plot"), ctx=canvas.getContext("2d");
+  const ov=$("ov"), octx=ov.getContext("2d");
+  const MINW=0.5;
+  const FLABEL={ raw:"원본 (Raw)", bp:"밴드패스 74.5–149.5Hz", rect:"정류 (rectify)", env:"활성도 (envelope)" };
+
+  const state={ ds:null, sig:null, cascade:null, rng:null, peaks:[], count:0, peakVal:0, meanVal:0,
+    filter:"env", cascadeOn:false, selStart:0, selEnd:20, hoverX:null, isDemo:false };
+  const drag={mode:null, offset:0};
+
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function percentile(s,p){ if(!s.length)return 0; const idx=clamp(p/100*(s.length-1),0,s.length-1),lo=Math.floor(idx),hi=Math.ceil(idx); return s[lo]+(s[hi]-s[lo])*(idx-lo); }
+  function rangeOf(arr){ const s=[...arr].sort((a,b)=>a-b); let lo=percentile(s,1),hi=percentile(s,99); if(hi-lo<1){lo=s[0];hi=s[s.length-1]||lo+1;} const pad=(hi-lo)*0.10||1; return {lo:lo-pad,hi:hi+pad}; }
+  function posRange(arr){ const s=[...arr].sort((a,b)=>a-b); const hi=Math.max(percentile(s,99)*1.15,1); return {lo:0,hi}; }
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function niceStep(x){ const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p; return (f<1.5?1:f<3?2:f<7?5:10)*p; }
+
+  // ===== EMG 필터 (아두이노와 동일, raw에서 계산) =====
+  function emgBandpass(raw){
+    const S=[ {a1:0.05159732,a2:0.36347401,b0:0.01856301,b1:0.03712602,b2:0.01856301},
+              {a1:-0.53945795,a2:0.39764934,b0:1,b1:-2,b2:1},
+              {a1:0.47319594,a2:0.70744137,b0:1,b1:2,b2:1},
+              {a1:-1.00211112,a2:0.74520226,b0:1,b1:-2,b2:1} ];
+    const z1=[0,0,0,0], z2=[0,0,0,0];
+    return raw.map(inp=>{ let out=inp; for(let k=0;k<4;k++){ const s=S[k]; const x=out - s.a1*z1[k] - s.a2*z2[k]; out=s.b0*x + s.b1*z1[k] + s.b2*z2[k]; z2[k]=z1[k]; z1[k]=x; } return out; });
+  }
+  function envelopeOf(bp){ const N=128, buf=new Array(N).fill(0); let idx=0,sum=0; return bp.map(v=>{ const a=Math.abs(v); sum-=buf[idx]; sum+=a; buf[idx]=a; idx=(idx+1)%N; return (sum/N)*2; }); }
+
+  function detectContractions(env, fs){
+    const n=env.length; if(!n) return {count:0,peaks:[],peak:0,mean:0};
+    const skip=Math.min(n-1, Math.round(0.5*fs));        // 필터 정착 구간 제외
+    let peak=0,sum=0; for(let i=skip;i<n;i++){ if(env[i]>peak)peak=env[i]; sum+=env[i]; }
+    const mean=sum/Math.max(1,n-skip);
+    const thr=Math.max(mean+0.35*(peak-mean), peak*0.22);
+    const minGap=Math.round(0.4*fs), minWidth=Math.round(0.2*fs);   // 짧은 순간 스파이크 무시
+    const peaks=[]; let i=skip;
+    while(i<n){ if(env[i]>thr){ let j=i,pk=i; while(j<n&&env[j]>thr){ if(env[j]>env[pk])pk=j; j++; } if(j-i>=minWidth) peaks.push(pk); i=j+minGap; } else i++; }
+    return {count:peaks.length,peaks,peak:Math.round(peak),mean:Math.round(mean)};
+  }
+
+  function loadDataset(ds, isDemo=false){
+    const d=ds.data||ds; let raw=d.raw, t=d.t_ms;
+    if(!Array.isArray(raw)||!raw.length){ setStatus("JSON에서 data.raw 배열을 찾지 못했습니다.",true); return; }
+    const n=raw.length;
+    const fs=ds.sample_rate_hz||ds.effective_rate_hz||(ds.duration_s?Math.round(n/ds.duration_s):500);
+    if(!t||t.length!==n) t=Array.from({length:n},(_,i)=>i/fs*1000);
+    const duration=ds.duration_s||+(n/fs).toFixed(1);
+    state.ds={ raw,t,fs,n,duration_s:duration, recorded_at:ds.recorded_at||null };
+    const bp=emgBandpass(raw), rect=bp.map(Math.abs), env=envelopeOf(bp);
+    const sig={ raw, bp, rect, env }; state.sig=sig;
+    state.cascade=[ {data:raw,label:"원본 (Raw)"},{data:bp,label:"① 밴드패스"},{data:rect,label:"② 정류(rectify)"},{data:env,label:"③ 활성도(envelope)"} ];
+    state.rng=new Map(); state.rng.set(raw,rangeOf(raw)); state.rng.set(bp,rangeOf(bp)); state.rng.set(rect,posRange(rect)); state.rng.set(env,posRange(env));
+    const c=detectContractions(env,fs); state.peaks=c.peaks; state.count=c.count; state.peakVal=c.peak; state.meanVal=c.mean;
+    state.isDemo=isDemo; state.selStart=0; state.selEnd=duration; setPreset(0);
+    updateMetric(); updateChips(); updateRangeLabel(); resizeAll();
+    setStatus(isDemo?"샘플 데모 데이터입니다. 상단에서 본인의 EMG JSON을 불러오세요.":`불러오기 완료 · ${n.toLocaleString()} 샘플`);
+    $("demoflag").style.display=isDemo?"":"none";
+  }
+  function activeResult(){ return state.cascadeOn ? state.sig.env : state.sig[state.filter]; }
+  function updateMetric(){ $("ccount").textContent=state.count; $("csub").textContent="최대 활성도 "+state.peakVal; }
+  function updateChips(){ const d=state.ds; $("c_mean").textContent=state.meanVal; $("c_fs").textContent=d.fs+" Hz"; $("c_dur").textContent=d.duration_s+" s"; $("c_n").textContent=d.n.toLocaleString(); $("c_at").textContent=d.recorded_at?String(d.recorded_at).replace("T"," "):"—"; }
+  function updateRangeLabel(){ $("rangelbl").innerHTML=`${state.selStart.toFixed(1)} – ${state.selEnd.toFixed(1)} s <span class="dur">(${(state.selEnd-state.selStart).toFixed(1)}s)</span>`; }
+  function setPreset(w){ document.querySelectorAll("#zoomseg .pw").forEach(b=>b.setAttribute("aria-pressed",(+b.dataset.w===w)?"true":"false")); }
+  function clearPreset(){ document.querySelectorAll("#zoomseg .pw").forEach(b=>b.setAttribute("aria-pressed","false")); }
+  function applyWidth(w){ const total=state.ds.duration_s; if(w===0){state.selStart=0;state.selEnd=total;setPreset(0);} else{ const c=(state.selStart+state.selEnd)/2; let s=clamp(c-w/2,0,Math.max(0,total-w)); state.selStart=s; state.selEnd=Math.min(total,s+w); setPreset(w);} updateRangeLabel(); render(); drawOverview(); }
+
+  let W=0,H=0,DPR=1;
+  function render(){
+    if(!state.ds){ ctx.clearRect(0,0,W,H); return; }
+    const d=state.ds; ctx.clearRect(0,0,W,H);
+    const padL=14,padR=12,padT=12,padB=24, x0=padL,x1=W-padR,plotW=x1-x0,y0=padT,y1=H-padB,plotH=y1-y0;
+    const fs=d.fs, winSec=state.selEnd-state.selStart;
+    const i0=clamp(Math.round(state.selStart*fs),0,d.n-2), i1=clamp(Math.round(state.selEnd*fs),i0+1,d.n-1);
+    const mapX=i=>x0+(i-i0)/(i1-i0)*plotW;
+
+    let panels;
+    if(state.cascadeOn){ panels=state.cascade.map((s,k)=>({data:s.data,label:s.label,color:k===0?css("--raw"):css("--trace"),dots:k===3})); }
+    else if(state.filter==="raw"){ panels=[{data:state.sig.raw,label:"원본 (Raw)",color:css("--trace"),dots:false}]; }
+    else { panels=[{data:state.sig.raw,label:"원본 (Raw)",color:css("--raw"),dots:false},{data:state.sig[state.filter],label:FLABEL[state.filter],color:css("--trace"),dots:state.filter==="env"}]; }
+    const gap=panels.length>=4?9:14, ph=(plotH-gap*(panels.length-1))/panels.length;
+
+    const startS=state.selStart,endS=state.selEnd, major=niceStep(winSec/8), minor=winSec<=6?major/5:0;
+    ctx.lineWidth=1;
+    if(minor){ ctx.strokeStyle=css("--grid-minor"); ctx.beginPath(); for(let ts=Math.ceil(startS/minor)*minor;ts<=endS+1e-6;ts+=minor){const xx=mapX(ts*fs);ctx.moveTo(xx,y0);ctx.lineTo(xx,y1);} ctx.stroke(); }
+    ctx.strokeStyle=css("--grid-major"); ctx.beginPath(); const ticks=[];
+    for(let ts=Math.ceil(startS/major)*major;ts<=endS+1e-6;ts+=major){const xx=mapX(ts*fs);ctx.moveTo(xx,y0);ctx.lineTo(xx,y1);ticks.push([xx,ts]);} ctx.stroke();
+    ctx.fillStyle=css("--muted"); ctx.font='11px "IBM Plex Mono",monospace'; ctx.textAlign="center"; ctx.textBaseline="top";
+    ticks.forEach(([xx,ts])=>ctx.fillText(ts.toFixed(winSec<=6?1:0)+"s",xx,y1+6));
+
+    panels.forEach((pnl,pi)=>{
+      const py0=y0+pi*(ph+gap), py1=py0+ph, rng=state.rng.get(pnl.data)||rangeOf(pnl.data);
+      const mapY=v=>py1-(v-rng.lo)/(rng.hi-rng.lo)*(py1-py0);
+      ctx.strokeStyle=css("--grid-minor"); ctx.lineWidth=1; ctx.beginPath(); for(let g=0;g<=2;g++){const yy=py0+g/2*(py1-py0);ctx.moveTo(x0,yy);ctx.lineTo(x1,yy);} ctx.stroke();
+      ctx.strokeStyle=css("--line"); ctx.strokeRect(x0,py0,plotW,py1-py0);
+      const sig=pnl.data, isEnv=(pnl.label.indexOf("활성도")>=0);
+      // envelope는 채워서 강조
+      if(isEnv){ ctx.fillStyle=css("--accent-soft"); ctx.beginPath(); ctx.moveTo(mapX(i0),py1);
+        const span0=i1-i0;
+        if(span0<=plotW){ for(let i=i0;i<=i1;i++) ctx.lineTo(mapX(i),mapY(sig[i])); }
+        else { for(let px=0;px<=plotW;px++){ const a=i0+Math.floor(px/plotW*span0); ctx.lineTo(x0+px,mapY(sig[a])); } }
+        ctx.lineTo(mapX(i1),py1); ctx.closePath(); ctx.globalAlpha=.5; ctx.fill(); ctx.globalAlpha=1; }
+      ctx.strokeStyle=pnl.color; ctx.lineWidth=(pnl.color===css("--raw"))?1.0:1.6; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+      const span=i1-i0;
+      if(span<=plotW){ let first=true; for(let i=i0;i<=i1;i++){const xx=mapX(i),yy=mapY(sig[i]); if(first){ctx.moveTo(xx,yy);first=false;}else ctx.lineTo(xx,yy);} }
+      else { for(let px=0;px<=plotW;px++){ const a=i0+Math.floor(px/plotW*span),b=i0+Math.floor((px+1)/plotW*span); let mn=Infinity,mx=-Infinity; for(let i=a;i<b&&i<=i1;i++){const v=sig[i];if(v<mn)mn=v;if(v>mx)mx=v;} if(mn===Infinity)continue; const xx=x0+px; ctx.lineTo(xx,mapY(mx)); ctx.lineTo(xx,mapY(mn)); } }
+      ctx.stroke();
+      if(pnl.dots && state.peaks.length){ ctx.fillStyle=css("--peak"); for(const p of state.peaks){ if(p<i0||p>i1)continue; ctx.beginPath(); ctx.arc(mapX(p),mapY(sig[p]),3,0,Math.PI*2); ctx.fill(); } }
+      ctx.fillStyle=css("--muted"); ctx.font='600 11px "IBM Plex Sans KR",sans-serif'; ctx.textAlign="right"; ctx.textBaseline="top"; ctx.fillText(pnl.label,x1-8,py0+5);
+    });
+
+    if(state.hoverX!=null && state.hoverX>=x0 && state.hoverX<=x1){
+      const frac=(state.hoverX-x0)/plotW, idx=clamp(Math.round(i0+frac*(i1-i0)),0,d.n-1);
+      ctx.strokeStyle=css("--accent"); ctx.globalAlpha=.5; ctx.lineWidth=1; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(state.hoverX,y0); ctx.lineTo(state.hoverX,y1); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      const label=(idx/fs).toFixed(2)+"s"; ctx.font='11px "IBM Plex Mono",monospace'; const tw=ctx.measureText(label).width; const bx=clamp(state.hoverX+8,x0,x1-tw-12);
+      ctx.fillStyle=css("--ink"); ctx.globalAlpha=.92; ctx.fillRect(bx,y0+4,tw+12,20); ctx.globalAlpha=1; ctx.fillStyle=css("--bg"); ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(label,bx+6,y0+14);
+    }
+  }
+
+  let ovW=0,ovH=0; const ovPad=1;
+  const oT2X=t=>ovPad+t/state.ds.duration_s*(ovW-2*ovPad);
+  const oX2T=px=>clamp((px-ovPad)/(ovW-2*ovPad)*state.ds.duration_s,0,state.ds.duration_s);
+  function drawOverview(){
+    if(!state.ds)return; const d=state.ds;
+    octx.clearRect(0,0,ovW,ovH); octx.fillStyle=css("--surface-2"); octx.fillRect(0,0,ovW,ovH);
+    const w=ovW-2*ovPad,x0=ovPad, sig=state.sig.env, n=d.n, rng=state.rng.get(sig);
+    const mapY=v=>ovH-5-(v-rng.lo)/(rng.hi-rng.lo)*(ovH-10);
+    octx.strokeStyle=css("--raw"); octx.globalAlpha=.8; octx.lineWidth=1; octx.beginPath();
+    for(let px=0;px<=w;px++){ const a=Math.floor(px/w*n),b=Math.floor((px+1)/w*n); let mx=-Infinity; for(let i=a;i<b&&i<n;i++){ if(sig[i]>mx)mx=sig[i]; } if(mx===-Infinity)continue; const xx=x0+px; octx.moveTo(xx,ovH-4); octx.lineTo(xx,mapY(mx)); }
+    octx.stroke(); octx.globalAlpha=1;
+    const sx=oT2X(state.selStart),ex=oT2X(state.selEnd);
+    octx.fillStyle=css("--surface"); octx.globalAlpha=.55; octx.fillRect(0,0,sx,ovH); octx.fillRect(ex,0,ovW-ex,ovH); octx.globalAlpha=1;
+    octx.fillStyle=css("--accent"); octx.globalAlpha=.12; octx.fillRect(sx,0,ex-sx,ovH); octx.globalAlpha=1;
+    octx.strokeStyle=css("--accent"); octx.lineWidth=1.5; octx.strokeRect(sx+0.75,0.75,ex-sx-1.5,ovH-1.5);
+    octx.fillStyle=css("--accent"); [sx,ex].forEach(hx=>octx.fillRect(hx-1.5,0,3,ovH));
+  }
+  function ovHit(px){ const sx=oT2X(state.selStart),ex=oT2X(state.selEnd); if(px>=sx-4&&px<=ex+4)return "M"; return "OUT"; }
+  ov.addEventListener("pointerdown",e=>{ if(!state.ds)return; ov.setPointerCapture(e.pointerId); const px=e.offsetX,hit=ovHit(px),total=state.ds.duration_s; if(hit==="OUT"){const w=state.selEnd-state.selStart,c=oX2T(px);state.selStart=clamp(c-w/2,0,total-w);state.selEnd=state.selStart+w;} drag.mode="M"; drag.offset=oX2T(px)-state.selStart; updateRangeLabel(); render(); drawOverview(); });
+  ov.addEventListener("pointermove",e=>{ if(!state.ds)return; const px=e.offsetX; if(!drag.mode){ ov.style.cursor=ovHit(px)==="M"?"grab":"pointer"; return; } const total=state.ds.duration_s,t=oX2T(px),w=state.selEnd-state.selStart; state.selStart=clamp(t-drag.offset,0,total-w); state.selEnd=state.selStart+w; ov.style.cursor="grabbing"; updateRangeLabel(); render(); drawOverview(); });
+  const endDrag=e=>{ if(drag.mode){ drag.mode=null; try{ov.releasePointerCapture(e.pointerId);}catch(_){}} };
+  ov.addEventListener("pointerup",endDrag); ov.addEventListener("pointercancel",endDrag);
+  ov.addEventListener("keydown",e=>{ if(!state.ds)return; const total=state.ds.duration_s,w=state.selEnd-state.selStart,step=Math.max(0.1,w*0.1); if(e.key==="ArrowLeft"){state.selStart=clamp(state.selStart-step,0,total-w);state.selEnd=state.selStart+w;} else if(e.key==="ArrowRight"){state.selStart=clamp(state.selStart+step,0,total-w);state.selEnd=state.selStart+w;} else if(e.key==="Home"){state.selStart=0;state.selEnd=w;} else if(e.key==="End"){state.selEnd=total;state.selStart=total-w;} else return; e.preventDefault(); updateRangeLabel(); render(); drawOverview(); });
+
+  function resizeAll(){ DPR=window.devicePixelRatio||1; let r=canvas.getBoundingClientRect(); W=r.width;H=r.height; canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); let ro=ov.getBoundingClientRect(); ovW=ro.width;ovH=ro.height; ov.width=Math.round(ovW*DPR); ov.height=Math.round(ovH*DPR); octx.setTransform(DPR,0,0,DPR,0,0); render(); drawOverview(); }
+  function setStatus(m,err){ const s=$("status"); s.textContent=m||""; s.classList.toggle("err",!!err); }
+
+  // ===== sample: EMG with 4 contraction bursts =====
+  function makeSample(){
+    const fs=500,dur=20,n=fs*dur; const t=new Array(n),raw=new Array(n);
+    const bursts=[[2,4],[6.5,8.5],[11,13],[16,18.5]];
+    const ramp=x=>{ for(const [a,b] of bursts){ if(x>=a&&x<=b) return Math.min((x-a)/0.35,(b-x)/0.35,1); } return 0; };
+    for(let i=0;i<n;i++){ const x=i/fs; let v=2048 + 8*(Math.random()-0.5) + 18*Math.sin(2*Math.PI*60*x); const amp=ramp(x); if(amp>0) v+=amp*260*(Math.random()-0.5); raw[i]=Math.round(v); t[i]=+(x*1000).toFixed(1); }
+    return {device:"ESP32 + BioAmp EXG Pill (synthetic demo)",channel:"EMG",sample_rate_hz:fs,duration_s:dur,n_samples:n,recorded_at:"(샘플 데모)",data:{t_ms:t,raw}};
+  }
+
+  // ===== events =====
+  document.querySelectorAll("#filterseg button").forEach(b=>b.addEventListener("click",()=>{
+    state.cascadeOn=false; $("cascadeBtn").setAttribute("aria-pressed","false"); $("filterseg").classList.remove("dim");
+    document.querySelectorAll("#filterseg button").forEach(x=>x.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true"); state.filter=b.dataset.f; render(); drawOverview();
+  }));
+  $("cascadeBtn").addEventListener("click",()=>{ state.cascadeOn=!state.cascadeOn; $("cascadeBtn").setAttribute("aria-pressed",state.cascadeOn?"true":"false"); $("filterseg").classList.toggle("dim",state.cascadeOn); render(); drawOverview(); });
+  document.querySelectorAll("#zoomseg .pw").forEach(b=>b.addEventListener("click",()=>applyWidth(+b.dataset.w)));
+  function zoomBy(f){ if(!state.ds)return; const total=state.ds.duration_s,win=state.selEnd-state.selStart,c=(state.selStart+state.selEnd)/2; const nw=clamp(win*f,MINW,total); let s=clamp(c-nw/2,0,total-nw); state.selStart=s;state.selEnd=s+nw; clearPreset(); updateRangeLabel(); render(); drawOverview(); }
+  $("zin").addEventListener("click",()=>zoomBy(0.9)); $("zout").addEventListener("click",()=>zoomBy(1/0.9));
+  canvas.addEventListener("wheel",e=>{ if(!state.ds)return; e.preventDefault(); const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left; const x0=14,x1=W-12,plotW=x1-x0,frac=clamp((x-x0)/plotW,0,1); const total=state.ds.duration_s,win=state.selEnd-state.selStart,cur=state.selStart+frac*win; const nw=clamp(win*(e.deltaY<0?0.92:1/0.92),MINW,total); let s=clamp(cur-frac*nw,0,total-nw); state.selStart=s;state.selEnd=s+nw; clearPreset(); updateRangeLabel(); render(); drawOverview(); },{passive:false});
+  $("sampleBtn").addEventListener("click",()=>loadDataset(makeSample(),true));
+  $("file").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) readFile(f); });
+  $("themeBtn").addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme: dark)").matches; const next=dark?"light":"dark"; document.documentElement.setAttribute("data-theme",next); try{localStorage.setItem("emgtheme",next);}catch(_){} render(); drawOverview(); });
+  const card=$("plotcard");
+  ["dragenter","dragover"].forEach(ev=>card.addEventListener(ev,e=>{e.preventDefault();card.classList.add("drag");}));
+  ["dragleave","drop"].forEach(ev=>card.addEventListener(ev,e=>{e.preventDefault();if(ev!=="dragover")card.classList.remove("drag");}));
+  card.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
+  canvas.addEventListener("mousemove",e=>{ const r=canvas.getBoundingClientRect(); state.hoverX=e.clientX-r.left; render(); });
+  canvas.addEventListener("mouseleave",()=>{ state.hoverX=null; render(); });
+  function readFile(f){ const fr=new FileReader(); fr.onload=()=>{ try{ loadDataset(JSON.parse(fr.result),false); }catch(err){ setStatus("JSON을 읽을 수 없습니다: "+err.message,true); } }; fr.onerror=()=>setStatus("파일을 읽는 중 오류.",true); fr.readAsText(f); }
+  let rto; window.addEventListener("resize",()=>{clearTimeout(rto);rto=setTimeout(resizeAll,120);});
+
+  try{ const th=localStorage.getItem("emgtheme"); if(th) document.documentElement.setAttribute("data-theme",th);}catch(_){}
+  loadDataset(makeSample(), true);
+})();
+</script>
+</body>
+</html>
